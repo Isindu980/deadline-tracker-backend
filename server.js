@@ -26,14 +26,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // For form data
 
 
-// Test database connection and create tables
+// Database initialization with retry — don't crash the process on DB unreachable
+let dbInitialized = false;
+const DB_RETRY_DELAY = 15 * 1000; // 15 seconds
+
 const initializeDatabase = async () => {
+  // Use the checkConnection helper exported by config/db.js
   try {
-    // Test connection
-    const client = await pool.connect();
+    const ok = typeof pool.checkConnection === 'function' ? await pool.checkConnection() : false;
+
+    if (!ok) {
+      console.error('❌ Database not reachable during startup. Server will continue in degraded mode and retry in background.');
+      // Schedule a retry
+      setTimeout(initializeDatabase, DB_RETRY_DELAY);
+      return;
+    }
+
+    if (dbInitialized) return; // already done
+
     console.log('✅ Database connected successfully');
-    client.release();
-    
+
     // Create tables if they don't exist
     console.log('🔧 Creating database tables...');
     await User.createTable();
@@ -42,22 +54,25 @@ const initializeDatabase = async () => {
     await DeadlineCollaborator.createTable();
     await InAppNotification.createTable();
     console.log('✅ Database tables created successfully');
-    
+
     // Initialize email service
     console.log('📧 Initializing email service...');
     await emailService.verifyConnection();
-    
+
     // Start notification service
     console.log('🔔 Starting notification service...');
     notificationService.start();
-    
+
+    dbInitialized = true;
+
   } catch (err) {
-    console.error('❌ Database initialization failed:', err.message);
-    process.exit(1);
+    // Don't exit the process — keep retrying
+    console.error('❌ Database initialization attempt failed:', err && err.message ? err.message : err);
+    setTimeout(initializeDatabase, DB_RETRY_DELAY);
   }
 };
 
-// Init database and create tables
+// Start initial attempt (non-blocking)
 initializeDatabase();
 
 // Health check 
