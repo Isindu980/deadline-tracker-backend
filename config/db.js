@@ -36,4 +36,6 @@ async function checkConnection() {
     }
 }
 
-module.exports = { pool, checkConnection };
+// Export pool for backwards compatibility and attach helper
+pool.checkConnection = checkConnection;
+module.exports = pool;
