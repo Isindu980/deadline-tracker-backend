@@ -4,7 +4,7 @@ require('dotenv').config();
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    family: 4   // IPv 4
+    family: 6
 });
 
 // Test the connection
