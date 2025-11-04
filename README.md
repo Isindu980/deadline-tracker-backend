@@ -18,7 +18,6 @@ A lightweight Node.js + Express backend for a deadline tracking app. It supports
 1. Install dependencies
 
 ```powershell
-cd "E:\to-do app\deadline-tracker-backend"
 npm install
 ```
 
