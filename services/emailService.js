@@ -51,7 +51,7 @@ class EmailService {
 
             console.log('📧 Email service initialized successfully');
         } catch (error) {
-            console.error('❌ Email service initialization failed:', error.message);
+            console.error('❌ Email service initialization failed:', error && error.message ? error.message : error);
         }
     }
 
@@ -66,7 +66,7 @@ class EmailService {
             console.log('✅ Email server connection verified');
             return true;
         } catch (error) {
-            console.error('❌ Email server connection failed:', error.message);
+            console.error('❌ Email server connection failed:', error && error.message ? error.message : error);
             return false;
         }
     }
@@ -228,11 +228,11 @@ Deadline Tracker Team
             };
 
             const result = await this.transporter.sendMail(mailOptions);
-            console.log(`✅ Email sent successfully to ${to}:`, result.messageId);
+            console.log(`✅ Email sent successfully (messageId: ${result.messageId})`);
             return { success: true, messageId: result.messageId };
         } catch (error) {
-            console.error(`❌ Failed to send email to ${to}:`, error.message);
-            return { success: false, error: error.message };
+            console.error('❌ Failed to send email:', error && error.message ? error.message : error);
+            return { success: false, error: error && error.message ? error.message : error };
         }
     }
 
@@ -256,8 +256,8 @@ Deadline Tracker Team
                 text: template.text
             });
         } catch (error) {
-            console.error('Error sending deadline reminder:', error);
-            return { success: false, error: error.message };
+            console.error('Error sending deadline reminder:', error && error.message ? error.message : error);
+            return { success: false, error: error && error.message ? error.message : error };
         }
     }
 
@@ -281,8 +281,8 @@ Deadline Tracker Team
                 text: template.text
             });
         } catch (error) {
-            console.error('Error sending overdue notification:', error);
-            return { success: false, error: error.message };
+            console.error('Error sending overdue notification:', error && error.message ? error.message : error);
+            return { success: false, error: error && error.message ? error.message : error };
         }
     }
 
@@ -407,8 +407,8 @@ Deadline Tracker Team
                 text: text
             });
         } catch (error) {
-            console.error('Error sending daily summary:', error);
-            return { success: false, error: error.message };
+            console.error('Error sending daily summary:', error && error.message ? error.message : error);
+            return { success: false, error: error && error.message ? error.message : error };
         }
     }
 
@@ -439,8 +439,8 @@ This test email confirms that deadline notifications will be delivered successfu
                 text: testTemplate.text
             });
         } catch (error) {
-            console.error('Error sending test email:', error);
-            return { success: false, error: error.message };
+            console.error('Error sending test email:', error && error.message ? error.message : error);
+            return { success: false, error: error && error.message ? error.message : error };
         }
     }
 }

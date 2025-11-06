@@ -110,8 +110,7 @@ router.post('/', auth, createDeadline);
 // POST /api/deadlines/test-simple - Simple deadline creation for testing
 router.post('/test-simple', auth, async (req, res) => {
   try {
-    console.log('🧪 Simple deadline test started');
-    console.log('Request body:', req.body);
+  console.log('🧪 Simple deadline test started');
     
     const { student_id, title, description, due_date } = req.body;
     
@@ -146,9 +145,9 @@ router.post('/test-simple', auth, async (req, res) => {
       status: 'pending'
     };
     
-    console.log('Creating deadline with data:', deadlineData);
+  console.log('Creating deadline (sanitized)');
     const deadline = await Deadline.create(deadlineData);
-    console.log('✅ Deadline created successfully:', deadline.id);
+  console.log('✅ Deadline created successfully (id:', deadline.id, ')');
     
     res.status(201).json({
       success: true,
@@ -157,7 +156,7 @@ router.post('/test-simple', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Simple deadline test error:', error);
+  console.error('❌ Simple deadline test error:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Test failed',
@@ -169,7 +168,7 @@ router.post('/test-simple', auth, async (req, res) => {
 // POST /api/deadlines/test-collaborator - Test adding collaborator
 router.post('/test-collaborator', auth, async (req, res) => {
   try {
-    console.log('🧪 Collaborator test started');
+  console.log('🧪 Collaborator test started');
     
     const { deadline_id, user_id } = req.body;
     
@@ -183,17 +182,17 @@ router.post('/test-collaborator', auth, async (req, res) => {
     const DeadlineCollaborator = require('../models/DeadlineCollaborator');
     
     // Test table creation first
-    console.log('Creating deadline_collaborators table if not exists...');
+  console.log('Creating deadline_collaborators table if not exists...');
     await DeadlineCollaborator.createTable();
     
     // Test adding collaborator
-    console.log(`Adding user ${user_id} as owner to deadline ${deadline_id}`);
+    console.log(`Adding owner to deadline (sanitized)`);
     const collaborator = await DeadlineCollaborator.addCollaborator(deadline_id, user_id, 'owner', {
       can_edit: true,
       can_delete: true
     });
     
-    console.log('✅ Collaborator added successfully:', collaborator);
+    console.log('✅ Collaborator added successfully');
     
     res.json({
       success: true,
@@ -202,7 +201,7 @@ router.post('/test-collaborator', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Collaborator test error:', error);
+  console.error('❌ Collaborator test error:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Collaborator test failed',
@@ -214,7 +213,7 @@ router.post('/test-collaborator', auth, async (req, res) => {
 // POST /api/deadlines/init-tables - Initialize required tables
 router.post('/init-tables', auth, async (req, res) => {
   try {
-    console.log('🧪 Initializing database tables...');
+  console.log('🧪 Initializing database tables...');
     
     const Deadline = require('../models/Deadline');
     const DeadlineCollaborator = require('../models/DeadlineCollaborator');
@@ -225,7 +224,7 @@ router.post('/init-tables', auth, async (req, res) => {
     await DeadlineCollaborator.createTable();
     await InAppNotification.createTable();
     
-    console.log('✅ All tables initialized successfully');
+  console.log('✅ All tables initialized successfully');
     
     res.json({
       success: true,
@@ -233,7 +232,7 @@ router.post('/init-tables', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Table initialization error:', error);
+  console.error('❌ Table initialization error:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Failed to initialize tables',
@@ -266,7 +265,7 @@ router.post('/debug-collaborators', auth, async (req, res) => {
       });
     }
 
-    console.log('🔍 Starting collaborator debug for deadline:', deadline_id, 'user:', user_id);
+  console.log('🔍 Starting collaborator debug (sanitized)');
     
     const DeadlineCollaborator = require('../models/DeadlineCollaborator');
     const pool = require('../config/db');
@@ -277,7 +276,7 @@ router.post('/debug-collaborators', auth, async (req, res) => {
       FROM information_schema.tables 
       WHERE table_schema = 'public' AND table_name = 'deadline_collaborators'
     `);
-    console.log('Table exists:', tableCheck.rows.length > 0);
+  console.log('Table exists:', tableCheck.rows.length > 0);
     
     // Step 2: Check table structure (only if table exists)
     let structureCheck = { rows: [] };
@@ -288,31 +287,30 @@ router.post('/debug-collaborators', auth, async (req, res) => {
         WHERE table_name = 'deadline_collaborators'
         ORDER BY ordinal_position
       `);
-      console.log('Table structure:', structureCheck.rows);
+  console.log('Table structure: [redacted]');
     }
     
     // Step 3: Try to add collaborator
-    console.log('Attempting to add collaborator...');
+    console.log('Attempting to add collaborator (sanitized)...');
     const addResult = await DeadlineCollaborator.addCollaborator(deadline_id, user_id, 'owner', {
       can_edit: true,
       can_delete: true
     });
-    console.log('Add collaborator result:', addResult);
+    console.log('Add collaborator result: success');
     
     // Step 4: Verify collaborator was added
-    console.log('Verifying collaborator was added...');
-    const verifyResult = await DeadlineCollaborator.getCollaboratorRole(deadline_id, user_id);
-    console.log('Verify result:', verifyResult);
+  console.log('Verifying collaborator was added (sanitized)');
+  const verifyResult = await DeadlineCollaborator.getCollaboratorRole(deadline_id, user_id);
     
     // Step 5: Get all collaborators for deadline
-    console.log('Getting all collaborators...');
-    const allCollaborators = await DeadlineCollaborator.getCollaborators(deadline_id);
-    console.log('All collaborators:', allCollaborators);
+  console.log('Getting all collaborators (sanitized)');
+  const allCollaborators = await DeadlineCollaborator.getCollaborators(deadline_id);
+  console.log(`All collaborators count: ${allCollaborators.length}`);
     
     // Step 6: Raw query check
-    console.log('Raw query check...');
-    const rawQuery = await pool.query('SELECT * FROM deadline_collaborators WHERE deadline_id = $1', [deadline_id]);
-    console.log('Raw query result:', rawQuery.rows);
+  console.log('Raw query check (sanitized)');
+  const rawQuery = await pool.query('SELECT * FROM deadline_collaborators WHERE deadline_id = $1', [deadline_id]);
+  console.log('Raw query row count:', rawQuery.rows.length);
     
     res.json({
       success: true,
@@ -328,7 +326,7 @@ router.post('/debug-collaborators', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Collaborator debug error:', error);
+  console.error('❌ Collaborator debug error:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Debug failed',
@@ -341,7 +339,7 @@ router.post('/debug-collaborators', auth, async (req, res) => {
 // POST /api/deadlines/fix-missing-owners - Fix deadlines missing owner collaborators
 router.post('/fix-missing-owners', auth, async (req, res) => {
   try {
-    console.log('🔧 Starting to fix missing owner collaborators...');
+  console.log('🔧 Starting to fix missing owner collaborators...');
     
     const DeadlineCollaborator = require('../models/DeadlineCollaborator');
     const Deadline = require('../models/Deadline');
@@ -349,7 +347,7 @@ router.post('/fix-missing-owners', auth, async (req, res) => {
     
     // Get all deadlines
     const allDeadlines = await pool.query('SELECT id, student_id, title FROM deadlines ORDER BY id');
-    console.log(`Found ${allDeadlines.rows.length} total deadlines`);
+  console.log(`Found ${allDeadlines.rows.length} total deadlines`);
     
     const results = {
       processed: 0,
@@ -361,7 +359,7 @@ router.post('/fix-missing-owners', auth, async (req, res) => {
     for (const deadline of allDeadlines.rows) {
       try {
         results.processed++;
-        console.log(`Processing deadline ${deadline.id}: "${deadline.title}" (owner: ${deadline.student_id})`);
+  console.log(`Processing deadline ${deadline.id} (owner id present)`);
         
         // Check if owner is already a collaborator
         const existingCollab = await DeadlineCollaborator.getCollaboratorRole(deadline.id, deadline.student_id);
@@ -387,8 +385,8 @@ router.post('/fix-missing-owners', auth, async (req, res) => {
           results.added++;
         }
         
-      } catch (error) {
-        console.error(`  ❌ Error processing deadline ${deadline.id}:`, error.message);
+        } catch (error) {
+        console.error(`  ❌ Error processing deadline ${deadline.id}:`, error && error.message ? error.message : error);
         results.errors.push({
           deadline_id: deadline.id,
           error: error.message
@@ -396,7 +394,7 @@ router.post('/fix-missing-owners', auth, async (req, res) => {
       }
     }
     
-    console.log('🎉 Fix operation completed:', results);
+  console.log('🎉 Fix operation completed');
     
     res.json({
       success: true,
@@ -405,7 +403,7 @@ router.post('/fix-missing-owners', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Fix operation failed:', error);
+    console.error('❌ Fix operation failed:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Fix operation failed',

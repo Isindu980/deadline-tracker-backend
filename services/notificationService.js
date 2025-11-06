@@ -19,7 +19,7 @@ class NotificationService {
       return;
     }
 
-    console.log('🚀 Starting notification service...');
+  console.log('🚀 Starting notification service...');
 
     // Check for notifications every hour
     const hourlyTask = cron.schedule('0 * * * *', async () => {
@@ -42,7 +42,7 @@ class NotificationService {
       `;
       await pool.query(query, [notificationType, value, deadlineId]);
     } catch (error) {
-      console.error(`❌ Error marking notification as sent:`, error);
+      console.error(`❌ Error marking notification as sent:`, error && error.message ? error.message : error);
     }
     });
 
@@ -102,7 +102,7 @@ class NotificationService {
         await this.sendNotificationForTimeframe(notification.hours, notification.type);
       }
     } catch (error) {
-      console.error('❌ Error in notification check:', error);
+      console.error('❌ Error in notification check:', error && error.message ? error.message : error);
     }
   }
 
@@ -122,17 +122,17 @@ class NotificationService {
         AND NOT (COALESCE(d.notifications_sent, '{}')::jsonb ? $3)
       `;
 
-      const result = await pool.query(query, [startTime, endTime, notificationType]);
+  const result = await pool.query(query, [startTime, endTime, notificationType]);
       const deadlines = result.rows;
 
-      console.log(`📨 Found ${deadlines.length} deadlines for ${hours}h notification`);
+  console.log(`📨 Found ${deadlines.length} deadlines for ${hours}h notification`);
 
       for (const deadline of deadlines) {
         await this.sendDeadlineNotificationToAllCollaborators(deadline, hours, notificationType);
       }
 
     } catch (error) {
-      console.error(`❌ Error sending ${hours}h notifications:`, error);
+      console.error(`❌ Error sending ${hours}h notifications:`, error && error.message ? error.message : error);
     }
   }
 
@@ -152,7 +152,7 @@ class NotificationService {
         const isInAppReminderEnabled = await User.isInAppReminderEnabled(recipient.user_id, notificationType);
         
         if (!isReminderEnabled && !isInAppReminderEnabled) {
-          console.log(`🔕 Skipping ${timeRemaining} notification for: ${deadline.title} to ${recipient.email} (all notifications disabled)`);
+          console.log(`🔕 Skipping ${timeRemaining} notification for deadline ${deadline.id} (recipient has notifications disabled)`);
           continue;
         }
 
@@ -170,9 +170,9 @@ class NotificationService {
           const emailResult = await emailService.sendDeadlineReminder(user, deadline, timeRemaining);
           if (emailResult.success) {
             emailSuccess = true;
-            console.log(`✅ Sent ${timeRemaining} email notification for: ${deadline.title} to ${user.email} (${recipient.role})`);
+            console.log(`✅ Sent ${timeRemaining} email notification for deadline ${deadline.id}`);
           } else {
-            console.error(`❌ Failed to send email notification for: ${deadline.title} to ${user.email}`, emailResult.error);
+            console.error(`❌ Failed to send email notification for deadline ${deadline.id}:`, emailResult.error && emailResult.error.message ? emailResult.error.message : emailResult.error);
           }
         }
 
@@ -181,9 +181,9 @@ class NotificationService {
           try {
             await InAppNotification.createDeadlineReminder(recipient.user_id, deadline, timeRemaining, notificationType);
             inAppSuccess = true;
-            console.log(`✅ Created ${timeRemaining} in-app notification for: ${deadline.title} for user ${recipient.user_id} (${recipient.role})`);
+            console.log(`✅ Created ${timeRemaining} in-app notification for deadline ${deadline.id}`);
           } catch (error) {
-            console.error(`❌ Failed to create in-app notification for: ${deadline.title} for user ${recipient.user_id}`, error);
+            console.error(`❌ Failed to create in-app notification for deadline ${deadline.id}:`, error && error.message ? error.message : error);
           }
         }
 
@@ -195,13 +195,13 @@ class NotificationService {
       }
 
       // Mark notification as sent if at least one email was successful
-      if (successCount > 0) {
+        if (successCount > 0) {
         await this.markNotificationSent(deadline.id, notificationType);
-        console.log(`📧 Notification summary for "${deadline.title}": ${successCount} sent, ${failureCount} failed`);
+        console.log(`📧 Notification summary for deadline ${deadline.id}: ${successCount} sent, ${failureCount} failed`);
       }
 
     } catch (error) {
-      console.error(`❌ Error sending notifications for deadline ${deadline.id}:`, error);
+      console.error(`❌ Error sending notifications for deadline ${deadline.id}:`, error && error.message ? error.message : error);
     }
   }
 
@@ -213,7 +213,7 @@ class NotificationService {
       const isInAppReminderEnabled = await User.isInAppReminderEnabled(deadline.student_id, notificationType);
       
       if (!isReminderEnabled && !isInAppReminderEnabled) {
-        console.log(`🔕 Skipping ${this.formatTimeRemaining(hours)} notification for: ${deadline.title} to ${deadline.email} (all notifications disabled)`);
+        console.log(`🔕 Skipping ${this.formatTimeRemaining(hours)} notification for deadline ${deadline.id} (all notifications disabled)`);
         return;
       }
 
@@ -228,24 +228,24 @@ class NotificationService {
       let inAppSuccess = false;
       
       // Send email notification if enabled
-      if (isReminderEnabled) {
+        if (isReminderEnabled) {
         const emailResult = await emailService.sendDeadlineReminder(user, deadline, timeRemaining);
         if (emailResult.success) {
           emailSuccess = true;
-          console.log(`✅ Sent ${timeRemaining} email notification for: ${deadline.title} to ${user.email}`);
+            console.log(`✅ Sent ${timeRemaining} email notification for deadline ${deadline.id}`);
         } else {
-          console.error(`❌ Failed to send email notification for: ${deadline.title}`, emailResult.error);
+            console.error(`❌ Failed to send email notification for deadline ${deadline.id}:`, emailResult.error && emailResult.error.message ? emailResult.error.message : emailResult.error);
         }
       }
 
       // Send in-app notification if enabled
-      if (isInAppReminderEnabled) {
+        if (isInAppReminderEnabled) {
         try {
           await InAppNotification.createDeadlineReminder(deadline.student_id, deadline, timeRemaining, notificationType);
           inAppSuccess = true;
-          console.log(`✅ Created ${timeRemaining} in-app notification for: ${deadline.title} for user ${deadline.student_id}`);
+          console.log(`✅ Created ${timeRemaining} in-app notification for deadline ${deadline.id}`);
         } catch (error) {
-          console.error(`❌ Failed to create in-app notification for: ${deadline.title} for user ${deadline.student_id}`, error);
+          console.error(`❌ Failed to create in-app notification for deadline ${deadline.id}:`, error && error.message ? error.message : error);
         }
       }
 
@@ -255,7 +255,7 @@ class NotificationService {
       }
 
     } catch (error) {
-      console.error(`❌ Error sending notification for deadline ${deadline.id}:`, error);
+      console.error(`❌ Error sending notification for deadline ${deadline.id}:`, error && error.message ? error.message : error);
     }
   }
 
@@ -270,7 +270,7 @@ class NotificationService {
       
       await pool.query(query, [notificationType, new Date().toISOString(), deadlineId]);
     } catch (error) {
-      console.error(`❌ Error marking notification as sent:`, error);
+      console.error(`❌ Error marking notification as sent:`, error && error.message ? error.message : error);
     }
   }
 
@@ -290,7 +290,7 @@ class NotificationService {
       const result = await pool.query(query);
       const recentlyOverdueDeadlines = result.rows;
 
-      console.log(`🚨 Found ${recentlyOverdueDeadlines.length} recently overdue deadlines (within last 4 hours)`);
+  console.log(`🚨 Found ${recentlyOverdueDeadlines.length} recently overdue deadlines (within last 4 hours)`);
 
       // Also get all overdue deadlines for status update (but won't send notifications for old ones)
       const allOverdueQuery = `
@@ -314,20 +314,20 @@ class NotificationService {
         // Check if we should send overdue notification
         const shouldSendNotification = await this.shouldSendOverdueNotification(deadline.id);
         
-        console.log(`🔔 Recently overdue deadline ${deadline.id} (${deadline.title}) - Should send notification: ${shouldSendNotification}`);
+        console.log(`🔔 Recently overdue deadline ${deadline.id} - Should send notification: ${shouldSendNotification}`);
         
         if (shouldSendNotification) {
-          console.log(`📧 Sending notification for deadline that became overdue: ${deadline.title}`);
+          console.log(`📧 Sending notification for overdue deadline ${deadline.id}`);
           await this.sendOverdueNotificationToAllCollaborators(deadline);
         } else {
           console.log(`⏭️ Skipping notification for deadline ${deadline.id} - already sent recently`);
         }
       }
 
-      console.log(`✅ Processed ${allOverdueDeadlines.length} total overdue deadlines, sent notifications for ${recentlyOverdueDeadlines.length} recently overdue ones`);
+  console.log(`✅ Processed ${allOverdueDeadlines.length} total overdue deadlines, sent notifications for ${recentlyOverdueDeadlines.length} recently overdue ones`);
 
     } catch (error) {
-      console.error('❌ Error checking overdue deadlines:', error);
+      console.error('❌ Error checking overdue deadlines:', error && error.message ? error.message : error);
     }
   }
 
@@ -408,7 +408,7 @@ class NotificationService {
       let successCount = 0;
       let failureCount = 0;
 
-      for (const recipient of recipients) {
+  for (const recipient of recipients) {
         // Check if user has overdue notifications enabled
         let hasOverdueEnabled = false;
         let hasInAppOverdueEnabled = false;
@@ -416,20 +416,20 @@ class NotificationService {
         try {
           hasOverdueEnabled = await User.hasOverdueNotificationsEnabled(recipient.user_id);
         } catch (error) {
-          console.error(`❌ Error checking email overdue notifications for user ${recipient.user_id}:`, error);
+          console.error(`❌ Error checking email overdue notifications:`, error && error.message ? error.message : error);
           hasOverdueEnabled = false;
         }
         
         try {
           hasInAppOverdueEnabled = await User.hasInAppOverdueNotificationsEnabled(recipient.user_id);
         } catch (error) {
-          console.error(`❌ Error checking in-app overdue notifications for user ${recipient.user_id}:`, error);
+          console.error(`❌ Error checking in-app overdue notifications:`, error && error.message ? error.message : error);
           // Default to true if method doesn't exist or fails
           hasInAppOverdueEnabled = true;
         }
         
         if (!hasOverdueEnabled && !hasInAppOverdueEnabled) {
-          console.log(`🔕 Skipping overdue notification for: ${deadline.title} to ${recipient.email} (all overdue notifications disabled)`);
+          console.log(`🔕 Skipping overdue notification for deadline ${deadline.id} (recipient has overdue notifications disabled)`);
           continue;
         }
 
@@ -447,26 +447,25 @@ class NotificationService {
           const emailResult = await emailService.sendOverdueNotification(user, deadline, overdueDuration);
           if (emailResult.success) {
             emailSuccess = true;
-            console.log(`✅ Sent overdue email notification for: ${deadline.title} to ${user.email} (${recipient.role})`);
+            console.log(`✅ Sent overdue email notification for deadline ${deadline.id}`);
           } else {
-            console.error(`❌ Failed to send overdue email for: ${deadline.title} to ${user.email}`, emailResult.error);
+            console.error(`❌ Failed to send overdue email for deadline ${deadline.id}:`, emailResult.error && emailResult.error.message ? emailResult.error.message : emailResult.error);
           }
         }
 
         // Send in-app overdue notification if enabled
         if (hasInAppOverdueEnabled) {
           try {
-            console.log(`📱 Creating in-app overdue notification for user ${recipient.user_id}...`);
+            console.log(`📱 Creating in-app overdue notification for deadline ${deadline.id}...`);
             const notificationResult = await InAppNotification.createOverdueNotification(recipient.user_id, deadline, overdueDuration);
-            console.log(`📱 Notification result:`, notificationResult);
+            console.log(`📱 Notification result: [redacted]`);
             inAppSuccess = true;
-            console.log(`✅ Created overdue in-app notification for: ${deadline.title} for user ${recipient.user_id} (${recipient.role})`);
+            console.log(`✅ Created overdue in-app notification for deadline ${deadline.id}`);
           } catch (error) {
-            console.error(`❌ Failed to create in-app overdue notification for: ${deadline.title} for user ${recipient.user_id}`, error);
-            console.error(`❌ Error details:`, error.stack);
+            console.error(`❌ Failed to create in-app overdue notification for deadline ${deadline.id}:`, error && error.message ? error.message : error);
           }
         } else {
-          console.log(`🔕 In-app overdue notifications disabled for user ${recipient.user_id}`);
+          console.log(`🔕 In-app overdue notifications disabled for a recipient of deadline ${deadline.id}`);
         }
 
         if (emailSuccess || inAppSuccess) {
@@ -479,11 +478,11 @@ class NotificationService {
       // Mark notification as sent if at least one notification was successful
       if (successCount > 0) {
         await this.markNotificationSent(deadline.id, 'overdue');
-        console.log(`🚨 Overdue notification summary for "${deadline.title}": ${successCount} sent, ${failureCount} failed`);
+        console.log(`🚨 Overdue notification summary for deadline ${deadline.id}: ${successCount} sent, ${failureCount} failed`);
       }
 
     } catch (error) {
-      console.error(`❌ Error sending overdue notifications for deadline ${deadline.id}:`, error);
+      console.error(`❌ Error sending overdue notifications for deadline ${deadline.id}:`, error && error.message ? error.message : error);
     }
   }
 
@@ -493,7 +492,7 @@ class NotificationService {
       const updatedDeadlines = await Deadline.updateOverdueDeadlines();
       console.log(`📅 Updated ${updatedDeadlines.length} deadlines to overdue status`);
     } catch (error) {
-      console.error('❌ Error updating overdue deadlines:', error);
+      console.error('❌ Error updating overdue deadlines:', error && error.message ? error.message : error);
     }
   }
 
@@ -527,7 +526,7 @@ class NotificationService {
       const result = await pool.query(query);
       const users = result.rows;
 
-      console.log(`📊 Found ${users.length} users with deadline activity for daily summary`);
+  console.log(`📊 Found ${users.length} users with deadline activity for daily summary`);
 
       let emailSummariesSent = 0;
       let inAppSummariesSent = 0;
@@ -539,7 +538,7 @@ class NotificationService {
           const hasInAppDailySummaryEnabled = await User.hasInAppDailySummaryEnabled(user.id);
 
           if (!hasEmailDailySummaryEnabled && !hasInAppDailySummaryEnabled) {
-            console.log(`🔕 Skipping daily summary for user ${user.email} (all daily summary notifications disabled)`);
+            console.log(`🔕 Skipping daily summary for a user (daily summary disabled)`);
             continue;
           }
 
@@ -557,12 +556,12 @@ class NotificationService {
               const emailResult = await emailService.sendDailySummary(user, summaryData);
               if (emailResult.success) {
                 emailSummariesSent++;
-                console.log(`✅ Sent daily summary email to ${user.email}`);
+                console.log(`✅ Sent daily summary email`);
               } else {
-                console.error(`❌ Failed to send daily summary email to ${user.email}:`, emailResult.error);
+                console.error(`❌ Failed to send daily summary email:`, emailResult.error && emailResult.error.message ? emailResult.error.message : emailResult.error);
               }
             } catch (error) {
-              console.error(`❌ Error sending daily summary email to ${user.email}:`, error);
+              console.error(`❌ Error sending daily summary email:`, error && error.message ? error.message : error);
             }
           }
 
@@ -571,21 +570,21 @@ class NotificationService {
             try {
               await InAppNotification.createDailySummary(user.id, summaryData);
               inAppSummariesSent++;
-              console.log(`✅ Created daily summary in-app notification for user ${user.id}`);
+              console.log(`✅ Created daily summary in-app notification`);
             } catch (error) {
-              console.error(`❌ Failed to create daily summary in-app notification for user ${user.id}:`, error);
+              console.error(`❌ Failed to create daily summary in-app notification:`, error && error.message ? error.message : error);
             }
           }
 
         } catch (error) {
-          console.error(`❌ Error processing daily summary for user ${user.email}:`, error);
+          console.error(`❌ Error processing daily summary:`, error && error.message ? error.message : error);
         }
       }
 
       console.log(`📊 Daily summary completed: ${emailSummariesSent} emails sent, ${inAppSummariesSent} in-app notifications created`);
       
     } catch (error) {
-      console.error('❌ Error sending daily summary:', error);
+      console.error('❌ Error sending daily summary:', error && error.message ? error.message : error);
     }
   }
 

@@ -3,8 +3,7 @@ const InAppNotification = require('../models/InAppNotification');
 // Get user's notifications
 const getNotifications = async (req, res) => {
   try {
-    console.log('📱 Getting notifications for user:', req.user.userId);
-    console.log('Query parameters:', req.query);
+  // Getting notifications (user id and query parameters are not logged for privacy)
 
     const userId = req.user.userId;
     const { 
@@ -74,8 +73,7 @@ const getNotifications = async (req, res) => {
 
     const notifications = await InAppNotification.getUserNotifications(userId, options);
 
-    console.log('📬 Retrieved notifications:', notifications.length, 'notifications');
-    console.log('Sample notifications:', notifications.slice(0, 2));
+  console.log(`📬 Retrieved ${notifications.length} notifications`);
 
     res.json({
       success: true,
@@ -252,9 +250,7 @@ const deleteAllRead = async (req, res) => {
 // Create test notification
 const createTestNotification = async (req, res) => {
   try {
-    console.log('🧪 Creating test notification...');
-    console.log('User ID:', req.user.userId);
-    console.log('Request body:', req.body);
+  console.log('🧪 Creating test notification (request body and user id not logged)');
 
     const userId = req.user.userId;
     const { title, message, type } = req.body;
@@ -268,11 +264,9 @@ const createTestNotification = async (req, res) => {
       priority: 'normal'
     };
 
-    console.log('📋 Notification data:', notificationData);
-
-    const notification = await InAppNotification.create(notificationData);
-    
-    console.log('✅ Notification created successfully:', notification);
+  // Create notification (do not log notification contents or user identifiers)
+  const notification = await InAppNotification.create(notificationData);
+  console.log('✅ Notification created successfully');
 
     res.status(201).json({
       success: true,
@@ -310,8 +304,8 @@ const checkOverdueNotifications = async (req, res) => {
       LIMIT 10
     `;
     
-    const result = await pool.query(checkQuery);
-    console.log(`📋 Found ${result.rows.length} potentially overdue deadlines:`, result.rows);
+  const result = await pool.query(checkQuery);
+  console.log(`📋 Found ${result.rows.length} potentially overdue deadlines`);
     
     // Run the overdue check
     await notificationService.checkOverdueDeadlines();
@@ -324,15 +318,15 @@ const checkOverdueNotifications = async (req, res) => {
       LIMIT 5
     `;
     
-    const notifications = await pool.query(notifQuery);
-    console.log(`📱 Recent overdue notifications:`, notifications.rows);
+  const notifications = await pool.query(notifQuery);
+  console.log(`📱 Recent overdue notifications retrieved`);
     
     res.json({
       success: true,
       message: 'Overdue notification check completed successfully',
       data: {
-        potentially_overdue_deadlines: result.rows,
-        recent_overdue_notifications: notifications.rows
+        potentially_overdue_deadlines_count: result.rows.length,
+        recent_overdue_notifications_count: notifications.rows.length
       }
     });
 
@@ -567,40 +561,23 @@ const triggerOverdueCheck = async (req, res) => {
     
     const debugInfo = {
       total_overdue_found: overdueDeadlines.length,
-      deadlines: [],
+      deadlines_processed: 0,
       notifications_created: 0,
       errors: []
     };
 
     for (const deadline of overdueDeadlines.slice(0, 6)) { // Limit to 6 for debugging
       try {
-        const deadlineInfo = {
-          id: deadline.id,
-          title: deadline.title,
-          due_date: deadline.due_date,
-          status: deadline.status,
-          hours_overdue: Math.round(deadline.hours_overdue * 100) / 100,
-          collaborators: [],
-          notifications_created: 0
-        };
-
         // Get collaborators for this deadline
         const recipients = await DeadlineCollaborator.getNotificationRecipients(deadline.id);
-        console.log(`📋 Deadline "${deadline.title}" has ${recipients.length} collaborators`);
+        // Do not log recipient identifiers or emails — only counts
+        console.log(`📋 Processing deadline id=${deadline.id} with ${recipients.length} collaborators`);
+
+        let createdForThisDeadline = 0;
 
         for (const recipient of recipients) {
           try {
-            // Check if user has in-app overdue notifications enabled
             const hasInAppOverdueEnabled = await User.hasInAppOverdueNotificationsEnabled(recipient.user_id);
-            
-            const collaboratorInfo = {
-              user_id: recipient.user_id,
-              email: recipient.email,
-              role: recipient.role,
-              in_app_enabled: hasInAppOverdueEnabled,
-              notification_created: false,
-              error: null
-            };
 
             if (hasInAppOverdueEnabled) {
               // Calculate overdue duration
@@ -617,42 +594,28 @@ const triggerOverdueCheck = async (req, res) => {
                 overdueDuration = `${hours} hour${hours > 1 ? 's' : ''}`;
               }
 
-              // Create the notification
-              const notification = await InAppNotification.createOverdueNotification(
-                recipient.user_id, 
-                deadline, 
-                overdueDuration
-              );
-              
-              collaboratorInfo.notification_created = true;
-              collaboratorInfo.notification_id = notification.id;
-              deadlineInfo.notifications_created++;
+              // Create the notification (do not log recipient info)
+              await InAppNotification.createOverdueNotification(recipient.user_id, deadline, overdueDuration);
+              createdForThisDeadline++;
               debugInfo.notifications_created++;
-              
-              console.log(`✅ Created overdue notification for user ${recipient.user_id} (${recipient.email})`);
-            } else {
-              console.log(`🔕 In-app overdue notifications disabled for user ${recipient.user_id} (${recipient.email})`);
             }
 
-            deadlineInfo.collaborators.push(collaboratorInfo);
-
-          } catch (error) {
-            console.error(`❌ Error processing recipient ${recipient.user_id}:`, error);
+          } catch (err) {
+            console.error('❌ Error processing recipient (details omitted):', err.message);
             debugInfo.errors.push({
               deadline_id: deadline.id,
-              user_id: recipient.user_id,
-              error: error.message
+              error: err.message
             });
           }
         }
 
-        debugInfo.deadlines.push(deadlineInfo);
-        
-      } catch (error) {
-        console.error(`❌ Error processing deadline ${deadline.id}:`, error);
+        debugInfo.deadlines_processed++;
+
+      } catch (err) {
+        console.error('❌ Error processing deadline (details omitted):', err.message);
         debugInfo.errors.push({
           deadline_id: deadline.id,
-          error: error.message
+          error: err.message
         });
       }
     }
@@ -662,8 +625,13 @@ const triggerOverdueCheck = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Overdue deadline check completed with detailed debugging',
-      debug_info: debugInfo,
+      message: 'Overdue deadline check completed',
+      debug_info: {
+        total_overdue_found: debugInfo.total_overdue_found,
+        deadlines_processed: debugInfo.deadlines_processed,
+        notifications_created: debugInfo.notifications_created,
+        errors_count: debugInfo.errors.length
+      },
       timestamp: new Date().toISOString()
     });
 
@@ -683,29 +651,21 @@ const testUserPreferences = async (req, res) => {
     const userId = req.user.userId;
     const User = require('../models/User');
     
-    console.log(`🔍 Testing notification preferences for user ${userId}...`);
-    
-    const preferences = await User.getNotificationPreferences(userId);
+    // Check preferences without logging or returning raw preference objects
     const hasInAppOverdueEnabled = await User.hasInAppOverdueNotificationsEnabled(userId);
     const hasEmailOverdueEnabled = await User.hasOverdueNotificationsEnabled(userId);
     const hasInAppEnabled = await User.hasInAppNotificationsEnabled(userId);
 
-    const testResults = {
-      user_id: userId,
-      raw_preferences: preferences,
-      tests: {
-        has_in_app_enabled: hasInAppEnabled,
-        has_in_app_overdue_enabled: hasInAppOverdueEnabled,
-        has_email_overdue_enabled: hasEmailOverdueEnabled
-      }
-    };
-
-    console.log('📋 User preferences test results:', testResults);
-
     res.json({
       success: true,
       message: 'User notification preferences tested successfully',
-      data: testResults
+      data: {
+        tests: {
+          has_in_app_enabled: hasInAppEnabled,
+          has_in_app_overdue_enabled: hasInAppOverdueEnabled,
+          has_email_overdue_enabled: hasEmailOverdueEnabled
+        }
+      }
     });
 
   } catch (error) {
@@ -768,8 +728,8 @@ const diagnosticCheck = async (req, res) => {
       `;
       
       const overdueResult = await pool.query(overdueQuery);
-      diagnostic.step2_deadlines.overdue_count = overdueResult.rows.length;
-      diagnostic.step2_deadlines.sample_overdue = overdueResult.rows;
+  diagnostic.step2_deadlines.overdue_count = overdueResult.rows.length;
+  // Do not include full deadline rows (may contain sensitive titles/dates); keep counts only
 
       // Check collaborators for first overdue deadline
       if (overdueResult.rows.length > 0) {
@@ -781,8 +741,8 @@ const diagnosticCheck = async (req, res) => {
           WHERE dc.deadline_id = $1
         `;
         
-        const collaboratorsResult = await pool.query(collaboratorsQuery, [firstDeadlineId]);
-        diagnostic.step2_deadlines.sample_collaborators = collaboratorsResult.rows;
+  const collaboratorsResult = await pool.query(collaboratorsQuery, [firstDeadlineId]);
+  diagnostic.step2_deadlines.sample_collaborators_count = collaboratorsResult.rows.length;
       }
     } catch (error) {
       diagnostic.errors.push(`Deadlines check error: ${error.message}`);
@@ -791,13 +751,10 @@ const diagnosticCheck = async (req, res) => {
     // Step 3: Check user preferences
     try {
       const userId = req.user.userId;
-      const preferences = await User.getNotificationPreferences(userId);
       const hasInAppEnabled = await User.hasInAppNotificationsEnabled(userId);
       const hasInAppOverdueEnabled = await User.hasInAppOverdueNotificationsEnabled(userId);
       
       diagnostic.step3_user_prefs = {
-        user_id: userId,
-        raw_preferences: preferences,
         in_app_enabled: hasInAppEnabled,
         in_app_overdue_enabled: hasInAppOverdueEnabled
       };
@@ -819,12 +776,9 @@ const diagnosticCheck = async (req, res) => {
       });
       
       diagnostic.step4_test_notification = {
-        success: true,
-        notification_id: testNotification.id,
-        created_at: testNotification.created_at
+        success: true
       };
-      
-      console.log('✅ Test notification created successfully:', testNotification.id);
+      console.log('✅ Test notification created successfully');
     } catch (error) {
       diagnostic.step4_test_notification = {
         success: false,
@@ -907,9 +861,9 @@ const forceOverdueNotifications = async (req, res) => {
           notifications_created: 0
         };
 
-        // Get collaborators
-        const recipients = await DeadlineCollaborator.getNotificationRecipients(deadline.id);
-        console.log(`📋 Processing ${recipients.length} collaborators for deadline: ${deadline.title}`);
+  // Get collaborators
+  const recipients = await DeadlineCollaborator.getNotificationRecipients(deadline.id);
+  console.log(`📋 Processing ${recipients.length} collaborators for deadline id=${deadline.id}`);
 
         for (const recipient of recipients) {
           try {
@@ -927,15 +881,14 @@ const forceOverdueNotifications = async (req, res) => {
               deadlineInfo.notifications_created++;
               results.notifications_created++;
               
-              console.log(`✅ Created overdue notification for user ${recipient.user_id} (${recipient.email}) - deadline: ${deadline.title}`);
+              console.log('✅ Created overdue notification (recipient details omitted)');
             } else {
-              console.log(`🔕 Skipped user ${recipient.user_id} - overdue notifications disabled`);
+              console.log('🔕 Skipped recipient (details omitted) - overdue notifications disabled');
             }
           } catch (error) {
-            console.error(`❌ Error creating notification for user ${recipient.user_id}:`, error);
+            console.error('❌ Error creating notification for recipient (details omitted):', error.message);
             results.errors.push({
               deadline_id: deadline.id,
-              user_id: recipient.user_id,
               error: error.message
             });
           }

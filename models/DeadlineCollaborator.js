@@ -136,7 +136,7 @@ class DeadlineCollaborator {
   // Get deadline collaborators
   static async getCollaborators(deadlineId) {
     try {
-      console.log('Getting collaborators for deadline:', deadlineId);
+      console.log('Getting collaborators for deadline (id redacted in logs)');
       
       // First get actual database collaborators (for traditional collaboration)
       const dbQuery = `
@@ -147,8 +147,8 @@ class DeadlineCollaborator {
         ORDER BY u.username
       `;
       
-      const dbResult = await pool.query(dbQuery, [deadlineId]);
-      console.log(`Found ${dbResult.rows.length} database collaborators for deadline ${deadlineId}:`, dbResult.rows);
+  const dbResult = await pool.query(dbQuery, [deadlineId]);
+  console.log(`Found ${dbResult.rows.length} database collaborators for deadline (count only)`);
       
       // Also get copy collaborators from JSONB field (for copy-based collaboration tracking)
       const jsonbQuery = `
@@ -168,16 +168,16 @@ class DeadlineCollaborator {
           collab.role === 'copy_collaborator' || collab.has_copy === true
         );
         
-        console.log(`Found ${copyCollaborators.length} copy collaborators in JSONB for deadline ${deadlineId}:`, copyCollaborators);
+  console.log(`Found ${copyCollaborators.length} copy collaborators in JSONB for deadline (count only)`);
       }
       
       // Combine both types of collaborators
       const allCollaborators = [...dbResult.rows, ...copyCollaborators];
-      console.log(`Total collaborators for deadline ${deadlineId}: ${allCollaborators.length}`);
+  console.log(`Total collaborators for deadline (count only): ${allCollaborators.length}`);
       
       return allCollaborators;
     } catch (error) {
-      console.error('Error getting collaborators:', error);
+      console.error('Error getting collaborators:', error && error.message ? error.message : error);
       throw error;
     }
   }
@@ -291,7 +291,7 @@ class DeadlineCollaborator {
           
           if (copyCollaborator) {
             // User is only a copy collaborator, deny access to original
-            console.log(`🚫 Access denied: User ${userId} is copy collaborator for deadline ${deadlineId}, not original collaborator`);
+            console.log('🚫 Access denied: user is copy collaborator for this deadline (redacted)');
             return null;
           }
         }
@@ -527,12 +527,11 @@ class DeadlineCollaborator {
         params.push(filters.offset);
       }
 
-      console.log('Final SQL Query:', query);
-      console.log('Query parameters:', params);
+  // Query and params redacted from logs for privacy
 
-      const result = await pool.query(query, params);
+  const result = await pool.query(query, params);
       
-      console.log(`getUserAccessibleDeadlines: Found ${result.rows.length} deadlines for user ${userId}`);
+  console.log(`getUserAccessibleDeadlines: Found ${result.rows.length} deadlines (count only)`);
       
       // Get collaborators for each deadline
       const deadlinesWithCollaborators = await Promise.all(
@@ -544,7 +543,7 @@ class DeadlineCollaborator {
               collaborators
             };
           } catch (error) {
-            console.error(`Error getting collaborators for deadline ${deadline.id}:`, error);
+            console.error(`Error getting collaborators for deadline ${deadline.id}:`, error && error.message ? error.message : error);
             return {
               ...deadline,
               collaborators: []
@@ -554,13 +553,7 @@ class DeadlineCollaborator {
       );
       
       if (deadlinesWithCollaborators.length > 0) {
-        console.log('Sample deadline with collaborators:', {
-          id: deadlinesWithCollaborators[0].id,
-          title: deadlinesWithCollaborators[0].title,
-          student_id: deadlinesWithCollaborators[0].student_id,
-          user_role: deadlinesWithCollaborators[0].user_role,
-          collaborators_count: deadlinesWithCollaborators[0].collaborators?.length || 0
-        });
+        console.log('Sample deadline with collaborators retrieved (redacted)');
       }
       
       return deadlinesWithCollaborators;
@@ -742,7 +735,7 @@ class DeadlineCollaborator {
             if (originalResult.rows.length > 0) {
               rootDeadlineId = originalResult.rows[0].id;
               rootOwnerId = originalResult.rows[0].student_id;
-              console.log(`📋 Found original deadline ${rootDeadlineId} owned by user ${rootOwnerId} for base title: "${baseTitle}" (Strategy ${i + 1})`);
+              console.log(`📋 Found original deadline (id redacted) using strategy ${i + 1}`);
               break;
             }
           }
@@ -756,7 +749,7 @@ class DeadlineCollaborator {
         try {
           // Check if this user is the original/root owner
           if (userId === rootOwnerId) {
-            console.log(`� User ${userId} is the original owner of root deadline ${rootDeadlineId}`);
+            console.log('� User is the original owner of the root deadline (redacted)');
             
             // DENY the request - original owners cannot be added as collaborators to copies of their own deadlines
             if (rootDeadlineId !== originalDeadlineId) {
@@ -770,10 +763,10 @@ class DeadlineCollaborator {
                 is_original_owner: true,
                 error: 'Cannot add original owner to a copy of their own deadline',
                 denied: true,
-                message: `User ${userId} is the original owner of "${currentDeadline.title.replace(/\s*\(My Copy\)|\s*\(Copy\)/g, '').trim()}" and cannot be added as collaborator to copies of their own deadline.`
+                message: 'Original owner cannot be added to copies of their own deadline (redacted)'
               });
-              
-              console.log(`🚫 Request denied: User ${userId} owns the original deadline and cannot collaborate on copies`);
+               
+              console.log('🚫 Request denied: original owner cannot be added to copies (redacted)');
               continue; // Skip to next user, don't process further
             } else {
               // This is the original deadline, allow adding collaborators
@@ -788,13 +781,13 @@ class DeadlineCollaborator {
                 original_deadline_id: rootDeadlineId,
                 is_copy: false,
                 is_original_owner: true,
-                message: 'Added original owner as collaborator to existing deadline'
+                message: 'Added original owner as collaborator to existing deadline (redacted)'
               });
-              
-              console.log(`✅ Added original owner ${userId} as collaborator to original deadline ${originalDeadlineId}`);
+               
+              console.log('✅ Added original owner as collaborator to original deadline (redacted)');
             }
             
-            console.log(`✅ Added original owner ${userId} as collaborator to deadline ${originalDeadlineId}`);
+            console.log('✅ Added original owner as collaborator to deadline (redacted)');
             continue;
           }
 
@@ -818,9 +811,9 @@ class DeadlineCollaborator {
             deadline: deadlineCopy
           });
 
-          console.log(`✅ Created deadline copy ${deadlineCopy.id} for user ${userId}`);
+          console.log(`✅ Created deadline copy (id redacted)`);
         } catch (error) {
-          console.error(`❌ Failed to create copy for user ${userId}:`, error);
+          console.error(`❌ Failed to create copy for a user:`, error && error.message ? error.message : error);
           // Continue with other users even if one fails
           copies.push({
             user_id: userId,
@@ -875,8 +868,8 @@ class DeadlineCollaborator {
                   user_id: copy.user_id,
                   deadline_id: copy.deadline_id,
                   type: 'deadline_shared',
-                  title: `New Deadline: ${copy.deadline.title}`,
-                  message: `You've been added as a collaborator and received a copy of "${originalDeadline.title}". You can now track your progress independently.`,
+                  title: `New Deadline created`,
+                  message: `You've been added as a collaborator and received a copy of a deadline. You can now track your progress independently.`,
                   data: {
                     original_deadline_id: deadlineId,
                     copy_deadline_id: copy.deadline_id,
@@ -885,9 +878,9 @@ class DeadlineCollaborator {
                   priority: 'normal',
                   action_url: `/deadlines/${copy.deadline_id}`
                 });
-                console.log(`📱 Sent notification to user ${copy.user_id} about deadline copy`);
+                console.log(`📱 Sent notification about created copy (redacted)`);
               } catch (notificationError) {
-                console.error(`❌ Failed to send notification to user ${copy.user_id}:`, notificationError);
+                console.error(`❌ Failed to send notification for a copy:`, notificationError && notificationError.message ? notificationError.message : notificationError);
               }
             }
           }

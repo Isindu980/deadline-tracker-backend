@@ -105,19 +105,8 @@ const getAllDeadlines = async (req, res) => {
 
     // Use DeadlineCollaborator to get only user-accessible deadlines
     const deadlines = await DeadlineCollaborator.getUserAccessibleDeadlines(userId, filters);
-    console.log('Fetched user-accessible deadlines:', deadlines?.length || 0, 'for user:', userId);
-    
-    // Debug: Log collaborator information for each deadline
-    if (deadlines && deadlines.length > 0) {
-      deadlines.forEach((deadline, index) => {
-        console.log(`Deadline ${index + 1}: ID=${deadline.id}, Title="${deadline.title}", Collaborators=${deadline.collaborators?.length || 0}`);
-        if (deadline.collaborators && deadline.collaborators.length > 0) {
-          deadline.collaborators.forEach((collab, collabIndex) => {
-            console.log(`  Collaborator ${collabIndex + 1}: ${collab.username} (${collab.role})`);
-          });
-        }
-      });
-    }
+    // Log only non-sensitive operational info
+    console.log(`Fetched ${deadlines?.length || 0} user-accessible deadlines`);
 
     res.json({
       success: true,
@@ -131,12 +120,7 @@ const getAllDeadlines = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get all deadlines error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      query: req.query
-    });
+    console.error('Get all deadlines error:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -178,10 +162,7 @@ const getDeadlineById = async (req, res) => {
         can_manage_collaborators: deadline.user_access && (deadline.user_access.role === 'owner' || deadline.user_access.can_edit)
       };
       
-      console.log(`📋 Deadline ${id} retrieved with ${enhancedDeadline.collaborator_count} collaborators`);
-      if (enhancedDeadline.collaborators.length > 0) {
-        console.log('👥 Collaborators:', enhancedDeadline.collaborators.map(c => `${c.username} (${c.role})`).join(', '));
-      }
+      console.log(`📋 Deadline ${id} retrieved; collaborators count: ${enhancedDeadline.collaborator_count}`);
       
       res.json({
         success: true,
@@ -206,7 +187,7 @@ const getDeadlineById = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Get deadline by ID error:', error);
+    console.error('Get deadline by ID error:', error && error.message ? error.message : error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -217,11 +198,7 @@ const getDeadlineById = async (req, res) => {
 // Create a new deadline
 const createDeadline = async (req, res) => {
   try {
-    console.log('Create deadline request body:', req.body);
-    console.log('Original due_date received:', req.body.due_date);
-    console.log('Authenticated user:', req.user);
-    
-    console.log('🚀 Starting deadline creation process...');
+  // Starting deadline creation process (request body and user are intentionally not logged)
     
     const { 
       student_id, 
@@ -289,7 +266,7 @@ const createDeadline = async (req, res) => {
     }
 
     if (errors.length > 0) {
-      console.log('Validation errors:', errors);
+      console.log('Validation failed with', errors.length, 'error(s)');
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -309,23 +286,18 @@ const createDeadline = async (req, res) => {
     // Process the due_date - preserve user's intended time
     let formattedDueDate = due_date;
     if (due_date) {
-      console.log('Processing due_date:', due_date);
+      // Process due_date without logging the raw input to avoid leaking timestamps
       
       // Handle different date formats
       if (/^\d{4}-\d{2}-\d{2}$/.test(due_date)) {
         // Date only format - add end of day time
-        formattedDueDate = due_date + ' 23:59:59';
-        console.log('Added time to date-only input:', formattedDueDate);
+  formattedDueDate = due_date + ' 23:59:59';
       } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(due_date)) {
         // Datetime-local format (YYYY-MM-DDTHH:mm) - add seconds
-        formattedDueDate = due_date + ':00';
-        console.log('Added seconds to datetime-local input:', formattedDueDate);
+  formattedDueDate = due_date + ':00';
       }
       
-      console.log('Final formatted due_date:', formattedDueDate);
-      // PostgreSQL can handle ISO strings and standard datetime formats
-      // No need to convert timezone - keep it as user intended
-      console.log('Final formatted due_date:', formattedDueDate);
+      // Final formatted due_date prepared (not logged for privacy)
     }
 
     // Create deadline
@@ -342,87 +314,50 @@ const createDeadline = async (req, res) => {
       notes: notes ? notes.trim() : null
     };
 
-    console.log('Creating deadline with data:', deadlineData);
+  console.log('Creating deadline');
     
     let deadline;
     try {
-      console.log('🔍 About to call Deadline.create...');
       deadline = await Deadline.create(deadlineData);
-      console.log('✅ Deadline.create completed successfully');
-      console.log('📋 Created deadline object:', JSON.stringify(deadline, null, 2));
-      
-      // Verify the deadline was actually stored by checking the database
-      console.log('🔍 Verifying deadline was stored in database...');
+      console.log('✅ Deadline created successfully');
+      // Verification performed (no sensitive values logged)
       const verifyQuery = 'SELECT * FROM deadlines WHERE id = $1';
       const pool = require('../config/db');
       const verifyResult = await pool.query(verifyQuery, [deadline.id]);
       
       if (verifyResult.rows.length > 0) {
-        console.log('✅ Deadline verified in database:', verifyResult.rows[0].title);
+        console.log('✅ Deadline verified in database');
       } else {
         console.log('❌ Deadline NOT found in database after creation!');
       }
       
     } catch (createError) {
-      console.error('❌ Error in Deadline.create:', createError);
-      console.error('Error stack:', createError.stack);
+      console.error('❌ Error in Deadline.create:', createError && createError.message ? createError.message : createError);
       throw createError;
     }
 
     // Add owner as collaborator to ensure they appear in collaborator lists
-    console.log('Adding owner as collaborator...');
-    console.log(`Deadline ID: ${deadline.id}, Owner ID: ${deadline.student_id}`);
+  console.log('Adding owner as collaborator');
     
     try {
       const ownerCollab = await DeadlineCollaborator.addCollaborator(deadline.id, deadline.student_id, 'owner', {
         can_edit: true,
         can_delete: true
       });
-      console.log('✅ Owner added as collaborator successfully:', ownerCollab);
-      
-      // Verify the collaborator was actually added
-      const verifyCollab = await DeadlineCollaborator.getCollaboratorRole(deadline.id, deadline.student_id);
-      console.log('🔍 Verification - Owner collaborator record:', verifyCollab);
+  console.log('✅ Owner added as collaborator successfully');
       
     } catch (collabError) {
-      console.error('⚠️ Error adding owner as collaborator:', collabError);
-      console.error('Error details:', {
-        message: collabError.message,
-        stack: collabError.stack,
-        deadlineId: deadline.id,
-        ownerId: deadline.student_id
-      });
+      console.error('⚠️ Error adding owner as collaborator:', collabError.message);
       // Continue anyway since the deadline was created successfully
     }
     
     // Get the created deadline with collaborators
     let deadlineWithCollaborators;
     try {
-      console.log('🔍 Retrieving deadline with collaborators...');
       deadlineWithCollaborators = await DeadlineCollaborator.getDeadlineWithCollaborators(deadline.id, deadline.student_id);
-      console.log('✅ Retrieved deadline with collaborators');
-      console.log(`📋 Deadline collaborators count: ${deadlineWithCollaborators.collaborators?.length || 0}`);
-      
-      if (deadlineWithCollaborators.collaborators && deadlineWithCollaborators.collaborators.length > 0) {
-        console.log('👥 Collaborators list:');
-        deadlineWithCollaborators.collaborators.forEach((collab, index) => {
-          console.log(`  ${index + 1}. ${collab.username} (${collab.role}) - Edit: ${collab.can_edit}, Delete: ${collab.can_delete}`);
-        });
-      } else {
-        console.log('⚠️ No collaborators found for deadline');
-        
-        // Manual check for collaborators
-        console.log('🔍 Manual collaborator check...');
-        const manualCollabs = await DeadlineCollaborator.getCollaborators(deadline.id);
-        console.log('Manual collaborator query result:', manualCollabs);
-      }
-      
+      console.log('✅ Retrieved deadline with collaborators (collaborator count:', (deadlineWithCollaborators.collaborators || []).length, ')');
     } catch (retrieveError) {
-      console.error('⚠️ Error retrieving deadline with collaborators:', retrieveError);
-      console.error('Retrieve error details:', {
-        message: retrieveError.message,
-        stack: retrieveError.stack
-      });
+      console.error('⚠️ Error retrieving deadline with collaborators:', retrieveError.message);
       // Fallback to basic deadline object
       deadlineWithCollaborators = deadline;
     }
@@ -436,13 +371,8 @@ const createDeadline = async (req, res) => {
       }
     });
 
-  } catch (error) {
-    console.error('Create deadline error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      requestBody: req.body
-    });
+    } catch (error) {
+    console.error('Create deadline error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -468,15 +398,8 @@ const updateDeadline = async (req, res) => {
       notes
     } = req.body;
 
-    // Debug logging
-    console.log('Update deadline request:', {
-      id,
-      body: req.body,
-      due_date,
-      title,
-      priority,
-      status
-    });
+    // Debug logging (redacted)
+    console.log('Update deadline requested (request body redacted)');
 
     // Validation
     const errors = [];
@@ -543,8 +466,7 @@ const updateDeadline = async (req, res) => {
     }
 
     if (errors.length > 0) {
-      console.log('Validation errors in update:', errors);
-      console.log('Request data:', { title, description, due_date, priority, status, category, subject, estimated_hours, actual_hours, completion_percentage, notes });
+      console.log('Validation errors in update (count):', errors.length);
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -568,21 +490,18 @@ const updateDeadline = async (req, res) => {
     if (due_date !== undefined) {
       // Process the due_date - preserve user's intended time
       let formattedDueDate = due_date;
-      console.log('Updating due_date from:', due_date);
-      
+      // NOTE: input values are intentionally not logged to avoid leaking timestamps
       // Handle different date formats
       if (/^\d{4}-\d{2}-\d{2}$/.test(due_date)) {
         // Date only format - add end of day time
         formattedDueDate = due_date + ' 23:59:59';
-        console.log('Added time to date-only input:', formattedDueDate);
       } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(due_date)) {
         // Datetime-local format (YYYY-MM-DDTHH:mm) - add seconds
         formattedDueDate = due_date + ':00';
-        console.log('Added seconds to datetime-local input:', formattedDueDate);
       }
       
       updateData.due_date = formattedDueDate;
-      console.log('Final formatted due_date for update:', formattedDueDate);
+      // Processed due_date input for update (value not logged for privacy)
     }
     if (priority !== undefined) updateData.priority = priority;
     if (status !== undefined) updateData.status = status;
