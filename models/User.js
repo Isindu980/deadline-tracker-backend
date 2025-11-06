@@ -62,13 +62,21 @@ class User {
     try {
       await pool.query(query);
       console.log('Users table created successfully');
-      
-      // Add notification_preferences column if it doesn't exist (for existing installations)
+
+      // Add missing columns for older installs: notification_preferences, reset_token, reset_token_expires
       const alterQuery = `
-        DO $$ 
-        BEGIN 
+        DO $$
+        BEGIN
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='notification_preferences') THEN
             ALTER TABLE users ADD COLUMN notification_preferences JSONB DEFAULT '{"email_enabled": true, "in_app_enabled": true, "reminders": {"2_days": true, "1_day": true, "12_hours": true, "1_hour": true}, "overdue_notifications": true, "daily_summary": false, "in_app_reminders": {"2_days": true, "1_day": true, "12_hours": true, "1_hour": true}, "in_app_overdue": true}'::jsonb;
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='reset_token') THEN
+            ALTER TABLE users ADD COLUMN reset_token VARCHAR(255);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='reset_token_expires') THEN
+            ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP;
           END IF;
         END $$;
       `;
